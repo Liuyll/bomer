@@ -3,8 +3,19 @@ export const BASE = Symbol()
 export const STATE = Symbol()
 export const CHANGED = Symbol()
 
+interface IProxyState {
+    base: Object,
+    copy: {
+        [key: string]: any
+    },
+    isChanged: boolean,
+    scope: Object,
+    revoke: Function,
+    isArray: boolean
+}
+
 const handler = {
-    get(target,key) {
+    get(target: IProxyState, key) {
         if(key === STATE) return target
         if(key === BASE) return target.base
         if(key === COPY) return target.copy
@@ -17,7 +28,7 @@ const handler = {
         }
         return value
     },
-    set(target,key,val) {
+    set(target: IProxyState,key,val) {
         if(key === COPY) return target.copy = val
         if(key === BASE) throw new Error("Error: base can't change")
         if(getSource(target,key) === val) return true
@@ -28,7 +39,7 @@ const handler = {
 }
 
 
-function markChanged(state) {
+function markChanged(state: IProxyState) {
     if(state.isChanged) return
     state.isChanged = true
     state.copy = {}
@@ -38,15 +49,21 @@ function getSource(state,key) {
     return state.isChanged ? state.copy[key] : state.base[key]; 
 }
 
-export default function createProxy(state) {
-    const proxyState = {
+export default function createProxy(state): IProxyState {
+    const proxyState: IProxyState = {
         base: state,
         copy: null,
         isChanged: false,
-        scope: {}
+        scope: {},
+        isArray: Array.isArray(state),
+        revoke: null,
     }
 
     const {proxy, revoke} = Proxy.revocable(proxyState,handler)
-    proxyState['revoke'] = revoke
+    proxyState.revoke = revoke
     return proxy
+}
+
+export {
+    IProxyState
 }

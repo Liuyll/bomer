@@ -1,4 +1,4 @@
-import { useState, useCallback, useReducer } from 'React'
+import { useState, useCallback, useReducer } from 'react'
 import { produce } from '.'
 
 export const useImmutable = (state) => {
