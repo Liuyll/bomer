@@ -2,6 +2,8 @@ export const COPY = Symbol()
 export const BASE = Symbol()
 export const STATE = Symbol()
 export const CHANGED = Symbol()
+export const MODIFYCHAIN = Symbol()
+export const DELETE = Symbol()
 
 interface IProxyState {
     base: Object,
@@ -11,30 +13,47 @@ interface IProxyState {
     isChanged: boolean,
     scope: Object,
     revoke: Function,
-    isArray: boolean
+    isArray: boolean,
+    inModifyChain: boolean,
+    deletes: string[]
 }
 
-const handler = {
-    get(target: IProxyState, key) {
-        if(key === STATE) return target
-        if(key === BASE) return target.base
-        if(key === COPY) return target.copy
-        if(key === CHANGED) return target.isChanged
+let catching = false
+const getHandler = () => {
+    return {
+        get(target: IProxyState, key) {
+            if(key === STATE) return target
+            if(key === BASE) return target.base
+            if(key === COPY) return target.copy
+            if(key === CHANGED) return target.isChanged
+            if(key === MODIFYCHAIN) return target.inModifyChain
+            if(key === DELETE) return target.deletes
+            let value = getSource(target, key)
+    
+            if(Array.isArray(value) || Object.prototype.toString.call(value) === '[object Object]') {
+                if(target.scope[key]) return target.scope[key]
+                return target.scope[key] = createProxy(value)
+            }
 
-        let value = getSource(target,key)
-        if(Array.isArray(value) || Object.prototype.toString.call(value) === '[object Object]') {
-            if(target.scope[key]) return target.scope[key]
-            return target.scope[key] = createProxy(value)
+            if(catching) {
+                target.inModifyChain = true
+            }
+            return value
+        },
+        set(target: IProxyState,key,val) {
+            if(key === COPY) return target.copy = val
+            if(key === BASE) throw new Error("Error: base can't change")
+            if(getSource(target,key) === val) return true
+            if(!target.isChanged) markChanged(target)    
+            if(target.scope[key]) delete target.scope[key]
+            target.inModifyChain = true
+            return target.copy[key] = val
+        },
+        deleteProperty(target: IProxyState, key: any): boolean {
+            if(!target.deletes) target.deletes = []
+            target.deletes.push(key)
+            return true
         }
-        return value
-    },
-    set(target: IProxyState,key,val) {
-        if(key === COPY) return target.copy = val
-        if(key === BASE) throw new Error("Error: base can't change")
-        if(getSource(target,key) === val) return true
-        if(!target.isChanged) markChanged(target)    
-        if(target.scope[key]) delete target.scope[key]
-        return target.copy[key] = val
     }
 }
 
@@ -57,13 +76,20 @@ export default function createProxy(state): IProxyState {
         scope: {},
         isArray: Array.isArray(state),
         revoke: null,
+        inModifyChain: !!catching,
+        deletes: null
     }
 
-    const {proxy, revoke} = Proxy.revocable(proxyState,handler)
+    const {proxy, revoke} = Proxy.revocable(proxyState, getHandler())
     proxyState.revoke = revoke
     return proxy
 }
 
+const startCatching = () => catching = true
+const closeCatching = () => catching = false
+
 export {
-    IProxyState
+    IProxyState,
+    startCatching,
+    closeCatching
 }

@@ -4,6 +4,7 @@
   "description": "immutable data structure tools",
   "main": "lib/bomer.js",
   "dependencies": {
+    "immer": "^9.0.1",
     "react": "^17.0.2"
   },
   "devDependencies": {
