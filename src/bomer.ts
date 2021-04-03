@@ -1,4 +1,4 @@
-import createProxy, { closeCatching, IProxyState, startCatching } from './createProxy'
+import createProxy, { IProxyState } from './createProxy'
 import finalize from './finalize'
 
 type Recipe = (state: any, ...args : any[]) => void
@@ -14,15 +14,13 @@ function produce(state: Object, recipe: Recipe, action: Object)
 function produce(state: Object, recipe ?: Recipe, action ?: Object) {
     if(typeof state !== 'function') {
         if(typeof recipe !== 'function') throw new Error()
-        startCatching()
-        let bomerProxy: IProxyState = createProxy(state) 
+        let bomerProxy: IProxyState = createProxy(state, null) 
         
         if(action) {
             recipe(bomerProxy, action)
         } else {
             recipe(bomerProxy)
         }
-        closeCatching()
         
         return finalize(bomerProxy)
     } else {
@@ -31,10 +29,8 @@ function produce(state: Object, recipe ?: Recipe, action ?: Object) {
         let realRecipe: Recipe = state as Recipe
 
         return (action: Object) => {
-            startCatching()
-            const bomerProxy = createProxy(realState)
+            const bomerProxy = createProxy(realState, null)
             realRecipe(realState, action)
-            closeCatching()
 
             realState = finalize(bomerProxy)
             return realState

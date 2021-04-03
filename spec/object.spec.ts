@@ -28,6 +28,17 @@ describe('immutable object', () => {
 
         expect(newObj.a.b).to.be.equal(undefined)
     })
+    
+    it('delete unexisted property', () => {
+        const obj = {
+            a: {
+                b: 1,
+                c: 1
+            }
+        }
+
+        expect(() => produce(obj, (state) => delete state.a.e)).to.be.not.throw()
+    })
 
     it('delete property(rawObj is not modify)', () => {
         const obj = {

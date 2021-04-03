@@ -15,10 +15,10 @@ interface IProxyState {
     revoke: Function,
     isArray: boolean,
     inModifyChain: boolean,
-    deletes: string[]
+    deletes: string[],
+    parent: IProxyState
 }
 
-let catching = false
 const getHandler = () => {
     return {
         get(target: IProxyState, key) {
@@ -32,12 +32,23 @@ const getHandler = () => {
     
             if(Array.isArray(value) || Object.prototype.toString.call(value) === '[object Object]') {
                 if(target.scope[key]) return target.scope[key]
-                return target.scope[key] = createProxy(value)
+                return target.scope[key] = createProxy(value, target)
             }
 
-            if(catching) {
-                target.inModifyChain = true
+            if(target.base instanceof Map) {
+                if(key === 'get') {
+                    const get = (key) => {
+                        if(target.scope[key]) return target.scope[key]
+                        const source = value.call(target.base, key)
+                        if(Array.isArray(source) || Object.prototype.toString.call(source) === '[object Object]') {
+                            return target.scope[key] = createProxy(source, target)
+                        } 
+                        return target.scope[key] = source
+                    }
+                    return get
+                }
             }
+
             return value
         },
         set(target: IProxyState,key,val) {
@@ -46,17 +57,30 @@ const getHandler = () => {
             if(getSource(target,key) === val) return true
             if(!target.isChanged) markChanged(target)    
             if(target.scope[key]) delete target.scope[key]
-            target.inModifyChain = true
-            return target.copy[key] = val
+
+            // bp modify chain
+            bpModifyChain(target)
+
+            target.copy[key] = val
+            return true
         },
         deleteProperty(target: IProxyState, key: any): boolean {
             if(!target.deletes) target.deletes = []
+            if(!target.base.hasOwnProperty(key)) return true
             target.deletes.push(key)
+
+            bpModifyChain(target)
             return true
         }
     }
 }
 
+function bpModifyChain(target: IProxyState) {
+    while(target) {
+        target.inModifyChain = true
+        target = target.parent
+    }
+}
 
 function markChanged(state: IProxyState) {
     if(state.isChanged) return
@@ -65,10 +89,13 @@ function markChanged(state: IProxyState) {
 }
 
 function getSource(state,key) {
-    return state.isChanged ? state.copy[key] : state.base[key]; 
+    if(state.isChanged) {
+        return state.copy[key] !== undefined ? state.copy[key] : state.base[key]
+    } 
+    return state.base[key]
 }
 
-export default function createProxy(state): IProxyState {
+export default function createProxy(state, parent: IProxyState): IProxyState {
     const proxyState: IProxyState = {
         base: state,
         copy: null,
@@ -76,8 +103,9 @@ export default function createProxy(state): IProxyState {
         scope: {},
         isArray: Array.isArray(state),
         revoke: null,
-        inModifyChain: !!catching,
-        deletes: null
+        inModifyChain: false,
+        deletes: null,
+        parent
     }
 
     const {proxy, revoke} = Proxy.revocable(proxyState, getHandler())
@@ -85,11 +113,6 @@ export default function createProxy(state): IProxyState {
     return proxy
 }
 
-const startCatching = () => catching = true
-const closeCatching = () => catching = false
-
 export {
-    IProxyState,
-    startCatching,
-    closeCatching
+    IProxyState
 }

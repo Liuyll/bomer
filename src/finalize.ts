@@ -1,4 +1,5 @@
 import { COPY, BASE, STATE, IProxyState, MODIFYCHAIN, DELETE } from './createProxy'
+import { isProxyableObject } from './utils'
 
 export default function finalize(state: IProxyState) {
     let isModify: boolean
@@ -6,7 +7,8 @@ export default function finalize(state: IProxyState) {
     if(!isModify && state[MODIFYCHAIN]) isModify = true
 
     state[COPY] = state[COPY] || {}
-    
+
+    // console.log('state:', state)
     let newCopy: unknown
     if(isModify) {
         if(Array.isArray(state[BASE])) {
@@ -24,7 +26,6 @@ export default function finalize(state: IProxyState) {
                 ;(state[BASE] as Map<any, any>).forEach((val, key) => {
                     (newCopy as Map<any, any>).set(key, val)
                 })
-                console.log(newCopy)
             }   
         }
 
@@ -38,11 +39,22 @@ export default function finalize(state: IProxyState) {
     }
     
     if(isModify) {
-        // TODO: //
-        for(let key of Object.getOwnPropertyNames(newCopy)) {
-            if(Object.prototype.toString.call(state[key]) === '[object Object]') {
-                newCopy[key] = finalize(state[STATE].scope[key])
+        if(Array.isArray(newCopy) || Object.prototype.toString.call(newCopy) === '[object Object]') {
+            for(let key of Object.getOwnPropertyNames(newCopy)) {
+                if(isProxyableObject(state[key])) {
+                    newCopy[key] = finalize(state[STATE].scope[key])
+                }
             }
+        } else {
+            // map
+            if(newCopy instanceof Map) {
+                for(let [key, val] of newCopy as Map<any, any>) {
+                    if(isProxyableObject(val)) {
+                        ;(newCopy as Map<any, any>).set(key, finalize(state[STATE].scope[key]))
+                    }
+                }
+            }
+            // TODO: set
         }
     }
     
