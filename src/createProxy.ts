@@ -47,6 +47,20 @@ const getHandler = () => {
                     }
                     return get
                 }
+
+                // map.set
+                if(key ==='set') {
+                    const set = (key, val) => {
+                        if(getSource(target,key) === val) return true
+                        if(!target.isChanged) markChanged(target)  
+                        if(target.scope[key]) delete target.scope[key]
+
+                        bpModifyChain(target)
+                        target.copy[key] = val
+                        return true
+                    }
+                    return set
+                }
             }
 
             return value
@@ -89,10 +103,18 @@ function markChanged(state: IProxyState) {
 }
 
 function getSource(state,key) {
+    const get = (state, key) => {
+        if(state instanceof Map) {
+            // avoid get 'get'
+            if(key in state) return state[key]
+            return state.get(key)
+        }
+        return state[key]
+    }
     if(state.isChanged) {
-        return state.copy[key] !== undefined ? state.copy[key] : state.base[key]
+        return state.copy[key] !== undefined ? state.copy[key] : get(state.base, key)
     } 
-    return state.base[key]
+    return get(state.base, key)
 }
 
 export default function createProxy(state, parent: IProxyState): IProxyState {

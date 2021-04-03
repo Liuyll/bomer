@@ -3,6 +3,7 @@ import { isProxyableObject } from './utils'
 
 export default function finalize(state: IProxyState) {
     let isModify: boolean
+
     if(state[COPY] || state[DELETE]) isModify = true
     if(!isModify && state[MODIFYCHAIN]) isModify = true
 
@@ -24,7 +25,10 @@ export default function finalize(state: IProxyState) {
             case '[object Map]':
                 newCopy = new Map()
                 ;(state[BASE] as Map<any, any>).forEach((val, key) => {
-                    (newCopy as Map<any, any>).set(key, val)
+                    ;(newCopy as Map<any, any>).set(key, val)
+                    for(let key in state[COPY]) {
+                        (newCopy as Map<any, any>).set(key, state[COPY][key])
+                    }
                 })
             }   
         }

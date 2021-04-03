@@ -27,4 +27,24 @@ describe('immutable map', () => {
         expect(newObj.get('a')).to.be.not.equal(obj.get('a'))
         expect(newObj.get('a').c).to.be.equal(obj.get('a').c)
     })
+
+    it('general map set', () => {
+        const obj = new Map([['a', { b: 1 }]])
+
+        const newObj = produce(obj, (state) => {
+            state.set('a', 1)
+        })
+
+        expect(newObj.get('a')).to.be.equal(1)
+    })
+
+    it('general map set modify', () => {
+        const obj = new Map([['a', { b: 1 }]])
+
+        const newObj = produce(obj, (state) => {
+            state.set('a', 1)
+        })
+
+        expect(newObj).to.be.not.equal(obj)
+    })
 })
